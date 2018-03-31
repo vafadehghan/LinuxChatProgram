@@ -36,6 +36,7 @@
 #include <unistd.h>
 #include <pthread.h>
 #include <signal.h>
+#include <string.h>
 
 #define SERVER_TCP_PORT 7000	// Default port
 #define BUFLEN 512  	// Buffer length
@@ -44,8 +45,11 @@
 void* readThreadFunc();
 void* sendThreadFunc();
 void signal_catcher(int signo);
+void printFunc();
 int n, bytes_to_read, sd;
 char sbuf[BUFLEN], rbuf[BUFLEN], *bp;
+char* printBuffer[2048];
+int fileIndex = 0;
 
 int main (int argc, char **argv)
 {
@@ -56,9 +60,7 @@ int main (int argc, char **argv)
 	struct sockaddr_in server;
 	char  *host,   **pptr;
 	char str[16];
-  	pthread_t readThread, sendThread;
-	char fileBuffer[2048];
-	int index = 0;
+  pthread_t readThread, sendThread;
 
 	switch(argc)
 	{
@@ -118,7 +120,6 @@ int main (int argc, char **argv)
 
 
 void* readThreadFunc(){
-	int rbufIndex = 0;
 	bp = rbuf;
 	bytes_to_read = BUFLEN;
 	while (1) {
@@ -128,17 +129,43 @@ void* readThreadFunc(){
 			bp += n;
 			bytes_to_read -= n;
 		}
-	
+		printBuffer[fileIndex] = rbuf;
+		fileIndex++;
+
 		printf ("%s", rbuf);
+		// printf("%d\n", fileIndex);
+
 		fflush(stdout);
 	}
 
+}
+void printFunc(){
+	FILE* fp;
+	int tempIndex = 0;
+	remove("output.txt");
+	fp = fopen("output.txt", "w");
+	while (printBuffer[tempIndex] != NULL) {
+		fputs(printBuffer[tempIndex], fp);
+		printf("%s", printBuffer[tempIndex]);
+		tempIndex++;
+	}
+
+	fclose(fp);
 }
 
 void* sendThreadFunc(){
 	while (1)
 	{
 		fgets (sbuf, BUFLEN, stdin);
+		// if(!strcmp(sbuf, "-p\n")){
+		// 	printFunc();
+		// 	continue;
+		// }
+
+		// char meString[6] = "Me: ";
+		// strcat(meString, sbuf);
+		printBuffer[fileIndex] = sbuf;
+		fileIndex++;
 
 		// Transmit data through the socket
 		send (sd, sbuf, BUFLEN, 0);
@@ -149,6 +176,7 @@ void* sendThreadFunc(){
 
 void signal_catcher(int signo){
 	if(signo == SIGINT){
+		printFunc();
 		char eof[2];
 		eof[0] = EOF;
 		send(sd, eof, BUFLEN, 0);
