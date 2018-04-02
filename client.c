@@ -104,7 +104,6 @@ int main (int argc, char **argv)
 	pptr = hp->h_addr_list;
 	printf("\t\tIP Address: %s\n", inet_ntop(hp->h_addrtype, *pptr, str, sizeof(str)));
 	printf("Transmit:\n");
-	//gets(sbuf); // get user's text
 
 
 	pthread_create (&readThread, NULL, readThreadFunc, NULL);
@@ -120,6 +119,8 @@ int main (int argc, char **argv)
 
 
 void* readThreadFunc(){
+	int k = 0;
+	char* temp[1024];
 	bp = rbuf;
 	bytes_to_read = BUFLEN;
 	while (1) {
@@ -129,43 +130,38 @@ void* readThreadFunc(){
 			bp += n;
 			bytes_to_read -= n;
 		}
-		printBuffer[fileIndex] = rbuf;
-		fileIndex++;
 
+		temp[k]= (char *) malloc(strlen(rbuf) + 1);
+		memcpy(temp[k], rbuf, strlen(rbuf));
+
+		printBuffer[fileIndex++] = temp[k++];
 		printf ("%s", rbuf);
-		// printf("%d\n", fileIndex);
-
 		fflush(stdout);
 	}
 
 }
-void printFunc(){
-	FILE* fp;
-	int tempIndex = 0;
-	remove("output.txt");
-	fp = fopen("output.txt", "w");
-	while (printBuffer[tempIndex] != NULL) {
-		fputs(printBuffer[tempIndex], fp);
-		printf("%s", printBuffer[tempIndex]);
-		tempIndex++;
-	}
-
-	fclose(fp);
-}
 
 void* sendThreadFunc(){
+	int k = 0;
+	char* temp[1024];
 	while (1)
 	{
 		fgets (sbuf, BUFLEN, stdin);
-		// if(!strcmp(sbuf, "-p\n")){
-		// 	printFunc();
-		// 	continue;
-		// }
+		if(!strcmp(sbuf, "-p\n")){
+			fflush(stdin);
+			printFunc();
+			continue;
+		}
 
+
+		// 
 		// char meString[6] = "Me: ";
 		// strcat(meString, sbuf);
-		printBuffer[fileIndex] = sbuf;
-		fileIndex++;
+
+		temp[k]= (char *) malloc(strlen(sbuf) + 1);
+		 memcpy(temp[k], sbuf, strlen(sbuf));
+		 printBuffer[fileIndex++] = temp[k++];
+
 
 		// Transmit data through the socket
 		send (sd, sbuf, BUFLEN, 0);
@@ -174,9 +170,21 @@ void* sendThreadFunc(){
 	return NULL;
 }
 
+void printFunc(){
+	FILE* fp;
+	int tempIndex = 0;
+	remove("output.txt");
+	fp = fopen("output.txt", "w");
+	while (printBuffer[tempIndex] != NULL) {
+		fputs(printBuffer[tempIndex++], fp);
+	}
+
+	fclose(fp);
+}
+
+
 void signal_catcher(int signo){
 	if(signo == SIGINT){
-		printFunc();
 		char eof[2];
 		eof[0] = EOF;
 		send(sd, eof, BUFLEN, 0);
