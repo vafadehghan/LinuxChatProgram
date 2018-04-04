@@ -1,5 +1,5 @@
 /*---------------------------------------------------------------------------------------
---	SOURCE FILE:		client.c - A simple TCP client program.
+--	SOURCE FILE:	client.c - A simple TCP client program for the chat application.
 --
 --	PROGRAM:		client.exe
 --
@@ -7,17 +7,16 @@
 --
 --	DATE:			April 5, 2018
 --
---	REVISIONS:		(Date and Description)
---				January 2005
---					Modified the read loop to use fgets.
---					While loop is based on the buffer length
---				April 2018
---					Modified for C4981 Chat Room Assignment
---					Modified & redesigned:
---						Vafa Dehghan Saei & Luke Lee: April, 2018
+--	FUNCTIONS:		
+--					int main (int argc, char **argv)
+--					void* readThreadFunc()
+--					void* sendThreadFunc()
+--					void printFunc()
+--					void signal_catcher(int signo)
+--					
 --
---
---	DESIGNERS:		Aman Abdulla
+--	DESIGNERS:		Vafa Dehghan Saei
+--					Luke Lee
 --
 --	PROGRAMMERS:	Vafa Dehghan Saei
 --					Luke Lee
@@ -52,10 +51,12 @@ void* readThreadFunc();
 void* sendThreadFunc();
 void signal_catcher(int signo);
 void printFunc();
+
 int n, bytes_to_read, sd;
 char sbuf[BUFLEN], rbuf[BUFLEN], *bp;
 char* printBuffer[2048];
 int fileIndex = 0;
+
 
 int main (int argc, char **argv)
 {
@@ -66,7 +67,7 @@ int main (int argc, char **argv)
 	struct sockaddr_in server;
 	char  *host,   **pptr;
 	char str[16];
-  pthread_t readThread, sendThread;
+  	pthread_t readThread, sendThread;
 
 	switch(argc)
 	{
@@ -115,28 +116,45 @@ int main (int argc, char **argv)
 	fprintf(stdout, "| Server Address: %s\n", inet_ntop(hp->h_addrtype, *pptr, str, sizeof(str)));
    	fprintf(stdout, "\\====================================\n");
 
-	//printf("Connected:    Server Name: %s\n", hp->h_name);
-	//printf("\t\tIP Address: %s\n", inet_ntop(hp->h_addrtype, *pptr, str, sizeof(str)));
-	//printf("Transmit:\n");
-
 	pthread_create (&readThread, NULL, readThreadFunc, NULL);
 	pthread_create (&sendThread, NULL, sendThreadFunc, NULL);
 
 	pthread_join(readThread, NULL);
 	pthread_join(sendThread, NULL);
 
-
 	close (sd);
 	return (0);
 }
 
-
-void* readThreadFunc(){
+/*----------------------------------------------------------------------
+-- FUNCTION:	readThreadFunc
+--
+-- DATE:		April 5, 2018
+--
+-- DESIGNER:	Vafa Dehghan Saei 
+--
+-- PROGRAMMER:	Vafa Dehghan Saei
+--
+-- INTERFACE:	void* readThreadFunc()
+--
+-- ARGUMENT:	void		
+--
+-- RETURNS:		void*			- returns a function pointer to the
+--								  pthread_create() argument
+--
+-- NOTES:
+-- This function gets called after client connects to the server
+-- successfully, a new thread is created to receive any incoming message
+-- from server.
+----------------------------------------------------------------------*/
+void* readThreadFunc()
+{
 	int k = 0;
 	char* temp[1024];
 	bp = rbuf;
 	bytes_to_read = BUFLEN;
-	while (1) {
+	while (1)
+	{
 		n = 0;
 		while ((n = recv (sd, bp, bytes_to_read, 0)) < BUFLEN)
 		{
@@ -155,14 +173,37 @@ void* readThreadFunc(){
 
 }
 
-void* sendThreadFunc(){
+/*----------------------------------------------------------------------
+-- FUNCTION:	sendThreadFunc
+--
+-- DATE:		April 5, 2018
+--
+-- DESIGNER:	Vafa Dehghan Saei 
+--
+-- PROGRAMMER:	Vafa Dehghan Saei
+--
+-- INTERFACE:	void* sendThreadFunc()
+--
+-- ARGUMENT:	void		
+--
+-- RETURNS:		void*			- returns a function pointer to the
+--								  pthread_create() argument
+--
+-- NOTES:
+-- This function gets called after client connects to the server
+-- successfully, a new thread is created to listen for user input from
+-- stdin and put it in a send buffer.
+----------------------------------------------------------------------*/
+void* sendThreadFunc()
+{
 	int k = 0;
 	char* temp[1024];
 	while (1)
 	{
 		fprintf(stdout, "(Me): ");
 		fgets (sbuf, BUFLEN, stdin);
-		if(!strcmp(sbuf, "-p\n")){
+		if(!strcmp(sbuf, "-p\n"))
+		{
 			printf("[Chat saved to output.txt]\n");
 			fflush(stdin);
 			printFunc();
@@ -175,8 +216,8 @@ void* sendThreadFunc(){
 		// strcat(meString, sbuf);
 
 		temp[k]= (char *) malloc(strlen(sbuf) + 1);
-		 memcpy(temp[k], sbuf, strlen(sbuf));
-		 printBuffer[fileIndex++] = temp[k++];
+		memcpy(temp[k], sbuf, strlen(sbuf));
+		printBuffer[fileIndex++] = temp[k++];
 
 
 		// Transmit data through the socket
@@ -186,21 +227,62 @@ void* sendThreadFunc(){
 	return NULL;
 }
 
-void printFunc(){
+/*----------------------------------------------------------------------
+-- FUNCTION:	printFunc
+--
+-- DATE:		April 5, 2018
+--
+-- DESIGNER:	Vafa Dehghan Saei 
+--
+-- PROGRAMMER:	Vafa Dehghan Saei
+--
+-- INTERFACE:	void printFunc()
+--
+-- ARGUMENT:	void		
+--
+-- RETURNS:		void
+--
+-- NOTES:
+-- This function is called when user turns on the save to file mode.
+-- It saves the received messages to a text file.
+----------------------------------------------------------------------*/
+void printFunc()
+{
 	FILE* fp;
 	int tempIndex = 0;
 	remove("output.txt");
 	fp = fopen("output.txt", "w");
-	while (printBuffer[tempIndex] != NULL) {
+	while (printBuffer[tempIndex] != NULL)
+	{
 		fputs(printBuffer[tempIndex++], fp);
 	}
 
 	fclose(fp);
 }
 
-
-void signal_catcher(int signo){
-	if(signo == SIGINT){
+/*----------------------------------------------------------------------
+-- FUNCTION:	signal_catcher
+--
+-- DATE:		April 5, 2018
+--
+-- DESIGNER:	Vafa Dehghan Saei 
+--
+-- PROGRAMMER:	Vafa Dehghan Saei
+--
+-- INTERFACE:	void signal_catcher(int signo)
+--
+-- ARGUMENT:	int signo		- an int representing the signal number
+--
+-- RETURNS:		void
+--
+-- NOTES:
+-- This function sets the Ctrl-C signal to send an EOF character to the
+-- connected socket.
+----------------------------------------------------------------------*/
+void signal_catcher(int signo)
+{
+	if(signo == SIGINT)
+	{
 		char eof[2];
 		eof[0] = EOF;
 		send(sd, eof, BUFLEN, 0);
