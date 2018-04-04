@@ -57,8 +57,32 @@ char sbuf[BUFLEN], rbuf[BUFLEN], *bp;
 char* printBuffer[2048];
 int fileIndex = 0;
 
-
-int main (int argc, char **argv)
+/*----------------------------------------------------------------------
+-- FUNCTION:	main
+--
+-- DATE:		April 5, 2018
+--
+-- DESIGNER:	Vafa Dehghan Saei
+--				Luke Lee
+--
+-- PROGRAMMER:	Vafa Dehghan Saei
+--				Luke Lee
+--
+-- INTERFACE:	int main(int argc, char **argv)
+--
+-- ARGUMENT:	int argc		- an int that counts the number of
+--								  arguments from cmd line
+--				char **argv		- an array of char* that holds the
+--								  values of each argument		
+--
+-- RETURNS:		int				- returns 0 if no error occurs
+--
+-- NOTES:
+-- This is the entry point of the Linux chat console application for
+-- client. All the variables are initialized here, and connection to
+-- server is set up.
+----------------------------------------------------------------------*/
+int main(int argc, char **argv)
 {
 	signal(SIGINT, signal_catcher);
 
@@ -131,9 +155,11 @@ int main (int argc, char **argv)
 --
 -- DATE:		April 5, 2018
 --
--- DESIGNER:	Vafa Dehghan Saei 
+-- DESIGNER:	Vafa Dehghan Saei
+--				Luke Lee
 --
 -- PROGRAMMER:	Vafa Dehghan Saei
+--				Luke Lee
 --
 -- INTERFACE:	void* readThreadFunc()
 --
@@ -178,9 +204,11 @@ void* readThreadFunc()
 --
 -- DATE:		April 5, 2018
 --
--- DESIGNER:	Vafa Dehghan Saei 
+-- DESIGNER:	Vafa Dehghan Saei
+--				Luke Lee
 --
 -- PROGRAMMER:	Vafa Dehghan Saei
+--				Luke Lee
 --
 -- INTERFACE:	void* sendThreadFunc()
 --

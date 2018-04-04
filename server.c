@@ -1,5 +1,6 @@
 /*---------------------------------------------------------------------------------------
---	SOURCE FILE:		server.c -   A simple multiplexed echo server using TCP
+--	SOURCE FILE:	server.c -   A simple multiplexed echo server using TCP,
+--								 implemented in the chat room application.
 --
 --	PROGRAM:		server.exe
 --
@@ -17,7 +18,9 @@
 --
 --	NOTES:
 --	The program will accept TCP connections from multiple client machines.
--- 	The program will read data from each client socket and simply echo it back.
+-- 	The program will read data from each client socket and echo it back to
+--  all other clients except the one who sent the message, with the sender's
+--  ip address.
 ---------------------------------------------------------------------------------------*/
 #include <stdio.h>
 #include <sys/types.h>
@@ -42,7 +45,33 @@ struct ClientInfo
 	char ipAddr[BUFLEN];
 };
 
-int main (int argc, char **argv){
+/*----------------------------------------------------------------------
+-- FUNCTION:	main
+--
+-- DATE:		April 5, 2018
+--
+-- DESIGNER:	Vafa Dehghan Saei
+--				Luke Lee
+--
+-- PROGRAMMER:	Vafa Dehghan Saei
+--				Luke Lee
+--
+-- INTERFACE:	int main(int argc, char **argv)
+--
+-- ARGUMENT:	int argc		- an int that counts the number of
+--								  arguments from cmd line
+--				char **argv		- an array of char* that holds the
+--								  values of each argument		
+--
+-- RETURNS:		int				- returns 0 if no error occurs
+--
+-- NOTES:
+-- This is the entry point of the Linux chat console application for
+-- server. The server address struct is initialized here and starts to
+-- listen for incoming client connections.
+----------------------------------------------------------------------*/
+int main(int argc, char **argv)
+{
 	int i, maxi, nready, bytes_to_read, arg;
 	int listen_sd, new_sd, sockfd, port, maxfd, client[FD_SETSIZE];
 	uint client_len;
@@ -175,7 +204,7 @@ int main (int argc, char **argv){
 					bp += n;
 					bytes_to_read -= n;
 				}
-				for (int j = 0; j <= maxi; j++)	// check all clients for data
+				for (int j = 0; j <= maxi; j++)	// send to all other clients
 				{
 					if (buf[0] == EOF) // connection closed by client
 					{
