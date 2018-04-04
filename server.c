@@ -1,28 +1,26 @@
 /*---------------------------------------------------------------------------------------
---	SOURCE FILE:		mux_svr.c -   A simple multiplexed echo server using TCP
+--	SOURCE FILE:	server.c -   A simple multiplexed echo server using TCP,
+--								 implemented in the chat room application.
 --
---	PROGRAM:		mux.exe
+--	PROGRAM:		server.exe
 --
 --	FUNCTIONS:		Berkeley Socket API
 --
---	DATE:			February 18, 2001
---
---	REVISIONS:		(Date and Description)
---				February 20, 2008
---				Added a proper read loop
---				Added REUSEADDR
---				Added fatal error wrapper function
---
+--	DATE:			April 5, 2018
 --
 --	DESIGNERS:		Based on Richard Stevens Example, p165-166
---				Modified & redesigned: Aman Abdulla: February 16, 2001
+--					Modified & redesigned:
+--						Vafa Dehghan Saei & Luke Lee: April, 2018
 --
 --
---	PROGRAMMER:		Aman Abdulla
+--	PROGRAMMER:		Vafa Dehghan Saei
+--					Luke Lee
 --
 --	NOTES:
 --	The program will accept TCP connections from multiple client machines.
--- 	The program will read data from each client socket and simply echo it back.
+-- 	The program will read data from each client socket and echo it back to
+--  all other clients except the one who sent the message, with the sender's
+--  ip address.
 ---------------------------------------------------------------------------------------*/
 #include <stdio.h>
 #include <sys/types.h>
@@ -33,6 +31,7 @@
 #include <arpa/inet.h>
 #include <unistd.h>
 #include <string.h>
+#include <pthread.h>
 
 #define SERVER_TCP_PORT 7000	// Default port
 #define BUFLEN	512		//Buffer length
@@ -40,17 +39,57 @@
 #define LISTENQ	5
 #define MAXLINE 4096
 
-// Function Prototypes
+// Client structure
+struct ClientInfo
+{
+	int fileDesc;
+	char ipAddr[BUFLEN];
+};
 
-int main (int argc, char **argv){
+// Global variables
+struct ClientInfo clntInfo[FD_SETSIZE];
+
+// Function headers
+void* updateThreadFunc();
+void displayClientList();
+
+/*----------------------------------------------------------------------
+-- FUNCTION:	main
+--
+-- DATE:		April 5, 2018
+--
+-- DESIGNER:	Vafa Dehghan Saei
+--				Luke Lee
+--
+-- PROGRAMMER:	Vafa Dehghan Saei
+--				Luke Lee
+--
+-- INTERFACE:	int main(int argc, char **argv)
+--
+-- ARGUMENT:	int argc		- an int that counts the number of
+--								  arguments from cmd line
+--				char **argv		- an array of char* that holds the
+--								  values of each argument		
+--
+-- RETURNS:		int				- returns 0 if no error occurs
+--
+-- NOTES:
+-- This is the entry point of the Linux chat console application for
+-- server. The server address struct is initialized here and starts to
+-- listen for incoming client connections.
+----------------------------------------------------------------------*/
+int main(int argc, char **argv)
+{
 	int i, maxi, nready, bytes_to_read, arg;
-	int listen_sd, new_sd, sockfd, port, maxfd, client[FD_SETSIZE];
+	int listen_sd, new_sd, sockfd, port, maxfd;
 	uint client_len;
 	struct sockaddr_in server, client_addr;
 	char *bp, buf[BUFLEN], newbuf[BUFLEN], tempIP[BUFLEN];
    	ssize_t n;
-	char *ipAddresses[FD_SETSIZE];
+	//char *ipAddresses[FD_SETSIZE];
    	fd_set rset, allset;
+
+	pthread_t updateThread;
 
 	switch(argc)
 	{
@@ -73,7 +112,8 @@ int main (int argc, char **argv){
 
 	// set SO_REUSEADDR so port can be resused imemediately after exit, i.e., after CTRL-c
 	arg = 1;
-	if (setsockopt (listen_sd, SOL_SOCKET, SO_REUSEADDR, &arg, sizeof(arg)) == -1){
+	if (setsockopt (listen_sd, SOL_SOCKET, SO_REUSEADDR, &arg, sizeof(arg)) == -1)
+	{
 		perror("setsockopt");
 	}
 
@@ -88,6 +128,14 @@ int main (int argc, char **argv){
 		perror("bind error");
 	}
 
+	// printing starting message
+	fprintf(stdout, "/================================\\\n");
+   	fprintf(stdout, "| Welcome to the chat room!      |\n");
+   	fprintf(stdout, "| Server started on port %d.   |\n", port);
+   	fprintf(stdout, "| Type -d to show client list    |\n");
+   	fprintf(stdout, "\\================================/\n");
+	fprintf(stdout, "[Waiting for client connections...]\n");
+
 	// Listen for connections
 	// queue up to LISTENQ connect requests
 	listen(listen_sd, LISTENQ);
@@ -97,11 +145,12 @@ int main (int argc, char **argv){
 
 	for (i = 0; i < FD_SETSIZE; i++)
 	{
-		client[i] = -1;  // -1 indicates available entry
+		clntInfo[i].fileDesc = -1;  // -1 indicates available entry
 	}
  	FD_ZERO(&allset);
    	FD_SET(listen_sd, &allset);
 
+   	pthread_create(&updateThread, NULL, updateThreadFunc, NULL);
 
 	while (TRUE)
 	{
@@ -111,19 +160,21 @@ int main (int argc, char **argv){
 		if (FD_ISSET(listen_sd, &rset)) // new client connection
 		{
 			client_len = sizeof(client_addr);
-			if ((new_sd = accept(listen_sd, (struct sockaddr *) &client_addr, &client_len)) == -1){
+			if ((new_sd = accept(listen_sd, (struct sockaddr *) &client_addr, &client_len)) == -1)
+			{
 				perror("accept error");
 			}
-			printf(" Remote Address:  %s\n", inet_ntoa(client_addr.sin_addr));
-
+			printf("Client connected! Remote Address: %s\n", inet_ntoa(client_addr.sin_addr));
 
 
 			for (i = 0; i < FD_SETSIZE; i++)
 			{
-				if (client[i] < 0)
+				if (clntInfo[i].fileDesc < 0)
 				{
-					client[i] = new_sd;	// save descriptor.
-					ipAddresses[i] = inet_ntoa(client_addr.sin_addr);
+					clntInfo[i].fileDesc = new_sd;	// save descriptor.
+					//ipAddresses[i] = inet_ntoa(client_addr.sin_addr);
+					strcpy(clntInfo[i].ipAddr, inet_ntoa(client_addr.sin_addr));
+					//printf("Client added: %d, %d, %s\n", i, new_sd, clntInfo[i].ipAddr);
 					break;
 				}
 			}
@@ -151,7 +202,7 @@ int main (int argc, char **argv){
 		}
 		for (i = 0; i <= maxi; i++)	// check all clients for data
 		{
-			if ((sockfd = client[i]) < 0)
+			if ((sockfd = clntInfo[i].fileDesc) < 0)
 			{
 				continue;
 			}
@@ -164,24 +215,27 @@ int main (int argc, char **argv){
 					bp += n;
 					bytes_to_read -= n;
 				}
-				for (int j = 0; j <= maxi; j++)	// check all clients for data
+				for (int j = 0; j <= maxi; j++)	// send to all other clients
 				{
 					if (buf[0] == EOF) // connection closed by client
 					{
-						printf("Remote Address:  %s closed connection\n", inet_ntoa(client_addr.sin_addr));
+						//printf("Remote Address:  %s closed connection\n", inet_ntoa(client_addr.sin_addr));
+						printf("Remote Address:  %s closed connection\n", clntInfo[i].ipAddr);
 						FD_CLR(sockfd, &allset);
-						client[i] = -1;
+						clntInfo[i].fileDesc = -1;
 						break;
 						// ipAddresses[i] = -1;
 					}
-					if ((sockfd = client[j]) < 0 || j == i)
+					if ((sockfd = clntInfo[j].fileDesc) < 0 || j == i)
 					{
+						fprintf(stdout, "[%s] says: %s", clntInfo[i].ipAddr, buf);
 						continue;
 					}
-					
-					strcpy(tempIP, ipAddresses[i]);
+
+					strcpy(tempIP, clntInfo[i].ipAddr);
 					sprintf(newbuf, "%s: %s", tempIP, buf);
-					write(client[j], newbuf, BUFLEN);   // echo to client
+					fprintf(stdout, "[%s] says: %s", clntInfo[i].ipAddr, buf);
+					write(clntInfo[j].fileDesc, newbuf, BUFLEN);   // echo to client
 				}
 				if (--nready <= 0)
 				{
@@ -190,5 +244,39 @@ int main (int argc, char **argv){
 			}
 		}
 	}
+
+	pthread_join(updateThread, NULL);
+
 	return(0);
+}
+
+void* updateThreadFunc()
+{
+	char buff[BUFLEN];
+	while(1)
+	{
+		fgets(buff, BUFLEN, stdin);
+		if (strcmp(buff, "-d\n") == 0)
+		{
+			displayClientList();
+		}
+		else
+		{
+			printf("wrong string\n");
+		}
+	}
+}
+
+void displayClientList()
+{
+	int i;
+	fprintf(stdout, "Connected clients:\n");
+	for(i = 0; i < FD_SETSIZE; i++)
+	{
+		if (clntInfo[i].fileDesc >= 0)
+		{
+			fprintf(stdout, "%d. IP Address: %s\n", i + 1, clntInfo[i].ipAddr);
+		}
+	}
+	fprintf(stdout, "End of client list.\n");
 }
