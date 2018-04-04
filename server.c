@@ -31,6 +31,7 @@
 #include <arpa/inet.h>
 #include <unistd.h>
 #include <string.h>
+#include <pthread.h>
 
 #define SERVER_TCP_PORT 7000	// Default port
 #define BUFLEN	512		//Buffer length
@@ -44,6 +45,13 @@ struct ClientInfo
 	int fileDesc;
 	char ipAddr[BUFLEN];
 };
+
+// Global variables
+struct ClientInfo clntInfo[FD_SETSIZE];
+
+// Function headers
+void* updateThreadFunc();
+void displayClientList();
 
 /*----------------------------------------------------------------------
 -- FUNCTION:	main
@@ -73,7 +81,7 @@ struct ClientInfo
 int main(int argc, char **argv)
 {
 	int i, maxi, nready, bytes_to_read, arg;
-	int listen_sd, new_sd, sockfd, port, maxfd, client[FD_SETSIZE];
+	int listen_sd, new_sd, sockfd, port, maxfd;
 	uint client_len;
 	struct sockaddr_in server, client_addr;
 	char *bp, buf[BUFLEN], newbuf[BUFLEN], tempIP[BUFLEN];
@@ -81,7 +89,7 @@ int main(int argc, char **argv)
 	//char *ipAddresses[FD_SETSIZE];
    	fd_set rset, allset;
 
-	struct ClientInfo clntInfo[FD_SETSIZE];
+	pthread_t updateThread;
 
 	switch(argc)
 	{
@@ -121,10 +129,11 @@ int main(int argc, char **argv)
 	}
 
 	// printing starting message
-	fprintf(stdout, "/===============================\\\n");
-   	fprintf(stdout, "| Welcome to the chat room!     |\n");
-   	fprintf(stdout, "| Server started on port %d.  |\n", port);
-   	fprintf(stdout, "\\===============================/\n");
+	fprintf(stdout, "/================================\\\n");
+   	fprintf(stdout, "| Welcome to the chat room!      |\n");
+   	fprintf(stdout, "| Server started on port %d.   |\n", port);
+   	fprintf(stdout, "| Type -d to show client list    |\n");
+   	fprintf(stdout, "\\================================/\n");
 	fprintf(stdout, "[Waiting for client connections...]\n");
 
 	// Listen for connections
@@ -140,6 +149,8 @@ int main(int argc, char **argv)
 	}
  	FD_ZERO(&allset);
    	FD_SET(listen_sd, &allset);
+
+   	pthread_create(&updateThread, NULL, updateThreadFunc, NULL);
 
 	while (TRUE)
 	{
@@ -211,12 +222,13 @@ int main(int argc, char **argv)
 						//printf("Remote Address:  %s closed connection\n", inet_ntoa(client_addr.sin_addr));
 						printf("Remote Address:  %s closed connection\n", clntInfo[i].ipAddr);
 						FD_CLR(sockfd, &allset);
-						client[i] = -1;
+						clntInfo[i].fileDesc = -1;
 						break;
 						// ipAddresses[i] = -1;
 					}
-					if ((sockfd = client[j]) < 0 || j == i)
+					if ((sockfd = clntInfo[j].fileDesc) < 0 || j == i)
 					{
+						fprintf(stdout, "[%s] says: %s", clntInfo[i].ipAddr, buf);
 						continue;
 					}
 
@@ -232,5 +244,39 @@ int main(int argc, char **argv)
 			}
 		}
 	}
+
+	pthread_join(updateThread, NULL);
+
 	return(0);
+}
+
+void* updateThreadFunc()
+{
+	char buff[BUFLEN];
+	while(1)
+	{
+		fgets(buff, BUFLEN, stdin);
+		if (strcmp(buff, "-d\n") == 0)
+		{
+			displayClientList();
+		}
+		else
+		{
+			printf("wrong string\n");
+		}
+	}
+}
+
+void displayClientList()
+{
+	int i;
+	fprintf(stdout, "Connected clients:\n");
+	for(i = 0; i < FD_SETSIZE; i++)
+	{
+		if (clntInfo[i].fileDesc >= 0)
+		{
+			fprintf(stdout, "%d. IP Address: %s\n", i + 1, clntInfo[i].ipAddr);
+		}
+	}
+	fprintf(stdout, "End of client list.\n");
 }
