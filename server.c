@@ -86,7 +86,6 @@ int main(int argc, char **argv)
 	struct sockaddr_in server, client_addr;
 	char *bp, buf[BUFLEN], newbuf[BUFLEN], tempIP[BUFLEN];
    	ssize_t n;
-	//char *ipAddresses[FD_SETSIZE];
    	fd_set rset, allset;
 
 	pthread_t updateThread;
@@ -172,7 +171,6 @@ int main(int argc, char **argv)
 				if (clntInfo[i].fileDesc < 0)
 				{
 					clntInfo[i].fileDesc = new_sd;	// save descriptor.
-					//ipAddresses[i] = inet_ntoa(client_addr.sin_addr);
 					strcpy(clntInfo[i].ipAddr, inet_ntoa(client_addr.sin_addr));
 					//printf("Client added: %d, %d, %s\n", i, new_sd, clntInfo[i].ipAddr);
 					break;
@@ -224,7 +222,6 @@ int main(int argc, char **argv)
 						FD_CLR(sockfd, &allset);
 						clntInfo[i].fileDesc = -1;
 						break;
-						// ipAddresses[i] = -1;
 					}
 					if ((sockfd = clntInfo[j].fileDesc) < 0 || j == i)
 					{
@@ -234,7 +231,7 @@ int main(int argc, char **argv)
 
 					strcpy(tempIP, clntInfo[i].ipAddr);
 					sprintf(newbuf, "%s: %s", tempIP, buf);
-					fprintf(stdout, "[%s] says: %s", clntInfo[i].ipAddr, buf);
+					//fprintf(stdout, "[%s] says: %s", clntInfo[i].ipAddr, buf);
 					write(clntInfo[j].fileDesc, newbuf, BUFLEN);   // echo to client
 				}
 				if (--nready <= 0)
@@ -250,6 +247,28 @@ int main(int argc, char **argv)
 	return(0);
 }
 
+/*----------------------------------------------------------------------
+-- FUNCTION:	updateThreadFunc
+--
+-- DATE:		April 5, 2018
+--
+-- DESIGNER:	Vafa Dehghan Saei
+--				Luke Lee
+--
+-- PROGRAMMER:	Luke Lee
+--
+-- INTERFACE:	void* updateThreadFunc()
+--
+-- ARGUMENT:	void	
+--
+-- RETURNS:		void*			- returns a function pointer to the
+--								  pthread_create() argument
+--
+-- NOTES:
+-- This function is running on a new thread, and is responsible for
+-- listening to user input. If user types -d from stdin, it displays
+-- a list of currently connected clients.
+----------------------------------------------------------------------*/
 void* updateThreadFunc()
 {
 	char buff[BUFLEN];
@@ -262,11 +281,31 @@ void* updateThreadFunc()
 		}
 		else
 		{
-			printf("wrong string\n");
+			printf("[Enter -d to show client list]\n");
 		}
 	}
 }
 
+/*----------------------------------------------------------------------
+-- FUNCTION:	displayClientList
+--
+-- DATE:		April 5, 2018
+--
+-- DESIGNER:	Vafa Dehghan Saei
+--				Luke Lee
+--
+-- PROGRAMMER:	Luke Lee
+--
+-- INTERFACE:	void displayClientList()
+--
+-- ARGUMENT:	void	
+--
+-- RETURNS:		void
+--
+-- NOTES:
+-- This function is called when user types -d from stdin. It
+-- displays a list of currently connected clients.
+----------------------------------------------------------------------*/
 void displayClientList()
 {
 	int i;
